@@ -39,6 +39,11 @@ wss.on('connection', function connection(ws, req) {
             - server stacks inputs from pad client, streams them to the appropriate game clients, format depends on the game
   */
 
+  function logSend(msg) {
+    console.log(`< ${msg}`);
+    ws.send(msg);
+  }
+
   function globalInitHandler(message) {
     if (!clientState.didHello) {
         if (message === "HELLO") {
@@ -62,14 +67,14 @@ wss.on('connection', function connection(ws, req) {
   }
 
   function padInitHandler(message) {
-    if (gameId === undefined) {
+    if (clientState.gameId === undefined) {
       clientState.gameId = message;
       initGameState(clientState.gameId);
       clientState.handler = padStreamHandler;
 
       function streamToPad() {
         while (serverState.toPad[clientState.gameId].length > 0) {
-          ws.send(JSON.stringify(serverState.toPad[clientState.gameId].shift()));
+          logSend(serverState.toPad[clientState.gameId].shift());
         }
         setTimeout(streamToPad, STREAM_REFRESH_MS);
       }
@@ -83,16 +88,16 @@ wss.on('connection', function connection(ws, req) {
   }
 
   function gameInitHandler(message) {
-    if (gameId === undefined) {
+    if (clientState.gameId === undefined) {
       clientState.gameId = message;
       initGameState(clientState.gameId);
       clientState.handler = gameStreamHandler;
 
       function streamToGame() {
         while (serverState.toGame[clientState.gameId].length > 0) {
-          ws.send(JSON.stringify(serverState.toGame[clientState.gameId].shift()));
+          logSend(serverState.toGame[clientState.gameId].shift());
         }
-        setTimeout(streamInputsToGame, STREAM_REFRESH_MS);
+        setTimeout(streamToGame, STREAM_REFRESH_MS);
       }
 
       function gameStreamHandler(message) {
@@ -106,7 +111,11 @@ wss.on('connection', function connection(ws, req) {
   console.log(`client connected: ${req.socket.remoteAddress}`);
 
   ws.on('message', function incoming(message) {
-    console.log('received: %s', message);
+    console.log('> %s', message);
     clientState.handler(message);
+  });
+
+  ws.on('close', function disconnect(code, reason) {
+    console.log(`CLOSE ${code} ${reason}`)
   });
 });
